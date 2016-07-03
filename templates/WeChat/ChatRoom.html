@@ -1,0 +1,463 @@
+{% extends 'base.html' %}
+{% block page-container %}
+    {% csrf_token %}
+   <div class="chat-container">
+    <div class="left-contact-panel">
+        <div>
+
+          <!-- Nav tabs -->
+          <ul class="nav nav-tabs" role="tablist">
+            <li role="presentation"   class="active">
+                <a href="#friend" style="color: white;background-color: #337ab7" onclick="change_color(this)"  aria-controls="home" role="tab" data-toggle="tab">好友</a>
+            </li>
+            <li role="presentation" >
+                <a href="#group" style="color: white;background-color: black" onclick="change_color(this)" aria-controls="profile" role="tab" data-toggle="tab">群组</a>
+            </li>
+          </ul>
+
+          <!-- Tab panes -->
+          <div class="tab-content">
+            <div role="tabpanel" class="tab-pane active" id="friend">
+                <div  class="list-group">
+                    {% for friend in request.user.userprofile.friends.select_related %}
+                        <li contact-type="single" contact-id="{{ friend.id }}" onclick="OpenChatWindow_local(this)"
+                           style="background-color: black ;color: white"  class="list-group-item">
+                            <span class="hide badge" >0</span>
+                            <span class="contact-name">{{ friend.name }}</span>
+                        </li>
+                    {% endfor %}
+                </div>
+
+  </a>
+            </div>
+                    <div role="tabpanel" class="tab-pane" id="group">
+                         {% for group in request.user.userprofile.group_members.select_related %}
+                            <li contact-type="group" contact-id="{{ group.id }}" onclick="OpenChatWindow_local(this)"
+                               style="background-color: black ;color: white"  class="list-group-item">
+                                <span class="hide badge" >0</span>
+                                <span class="contact-name">{{ group.name }}</span>
+                                <div class="group-list"></div>
+                            </li>
+                        {% endfor %}
+            </div>
+          </div>
+        </div>
+    </div>
+    <div class="right-chat-panel">
+        <div class="chat-box-title">
+            title
+        </div>
+        <div class="chat-box-window">
+            window
+        </div>
+        <div class="ShowProgressBar">
+            <div class="progress hide">
+                <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">
+                0%
+                </div>
+            </div>
+        </div>
+        <div class="chat-box-emoj">
+            <div class="col-md-3">
+                <input id="file_upload" type="file">
+            </div>
+            <div class="col-md-2">
+                <span class="glyphicon glyphicon-upload" onclick="FileUpload()"></span>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <span onclick="get_old_chatrecord(this)" >历史消息</span>
+            </div>
+        </div>
+        <div class="chat-box-msg-box">
+            <textarea id="msg"></textarea>
+            <button class="btn btn-success">发送消息</button>
+        </div>
+    </div>
+    <div class="clear-both"></div>
+</div>
+
+
+{% endblock %}
+{% block bottom-js %}
+    <script>
+        // 全局的聊天记录字典，用户ID为key聊天记录为value
+        GLOBAL_CHAT_RECORD_DIC = {
+            'single':{},
+            'group':{},
+        };
+        // set csrf
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie != '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = jQuery.trim(cookies[i]);
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        var csrftoken = getCookie('csrftoken');
+
+        function csrfSafeMethod(method) {
+            // these HTTP methods do not require CSRF protection
+            return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+        }
+
+        ///////////////////////////////////////////////////////////////
+        // 以下开始真正的代码，上面都是CSRF的代码
+
+        // 把unix时间转换为正常的时间
+        function TransferUnixTime(unixtime){
+            var newDate = new Date();
+            newDate.setTime(unixtime * 1000);
+            var timestamp = newDate.toLocaleTimeString();
+            return timestamp
+        }
+
+
+        //把收到的消息放到聊天记录框里面
+        function AddChatBox(receive_data,flag){
+            var friend_name = $('.chat-box-title').children('span').attr('friend_name');
+            var current_session_id = $('.chat-box-title').children('span').attr('friend_id');
+            var current_chat_type = $('.chat-box-title').children('span').attr('chat_type');
+            // 做出判断，如果是需要得到历史消息，那么就把在传参的时候把flag写为history。。
+            if(flag != 'history'){
+                for (var i in  receive_data) {
+                        data = receive_data[i];
+                        console.log(data);
+                        var msg = data.msg;
+                        var chat_time = data.timestamp;
+                        var chat_type = data.type;
+                        timestamp = TransferUnixTime(chat_time);
+                        // 如果聊天类型是单用户聊天，那么消息的来源就是from,如果是组，就是to到对应的组
+                        if(chat_type == 'single') {
+                            var msg_from = data.from;
+                        }else{ // if not from person,then from group!
+                            var msg_from = data.to;
+                        }
+                        chat_record = "<div class='msg-item'><div><span> &nbsp;"+ data.from_name
+                                            + "</span>" + '&nbsp;&nbsp;&nbsp;' +"<span>" + timestamp  +
+                                            "</span></div>" + "<div class='msg-text'>&nbsp;&nbsp;"+ msg +"</div>" + "</div>";
+                        // whether the msg from people talk to me
+                        if( current_session_id == msg_from && chat_type == current_chat_type){
+                                $('.chat-box-window').children('.msg-item:last').after(chat_record)
+                        }else{ // the msg comes from people not talk to me
+                            if(GLOBAL_CHAT_RECORD_DIC[chat_type][msg_from]){ // if the dic have msg about msg_from
+                                GLOBAL_CHAT_RECORD_DIC[chat_type][msg_from] += chat_record;
+                            } else{
+                                GLOBAL_CHAT_RECORD_DIC[chat_type][msg_from] = chat_record;
+                            }
+                            console.log(GLOBAL_CHAT_RECORD_DIC[chat_type][msg_from])
+                        } // end if
+
+                        // notice user when he/she have a new message!!
+                        var cur_msg_ele = $('.list-group li[contact-type='+ chat_type +']').filter('li[contact-id='+ msg_from  +']');
+                        var cur_msg_num = $(cur_msg_ele).find('.badge').text();
+                        $(cur_msg_ele).find('.badge').removeClass('hide');
+                        $(cur_msg_ele).find('.badge').text(parseInt(cur_msg_num)+1);
+                        // 如果接受到的消息对象不是在当前面板上的，那么就在当前面板提醒消息来了,
+                        if(current_chat_type!=chat_type){
+                            var cur_msg_chattype_ele = $('.nav-tabs li').children('a[href=#'+ chat_type+']');
+                            $(cur_msg_chattype_ele).attr('style',"color: black;background-color: white")
+                        }
+                }}
+            else{
+                // get history msg from server
+                for (var i in receive_data){
+                    data = receive_data[i];
+                    console.log(data);
+                    var msg = data.Content;
+                    var chat_time = data.TimeStamp;
+                    var myself_name = '{{ request.user.userprofile.name }}';
+                    timestamp = TransferUnixTime(chat_time);
+                    if(data.myself_id == {{ request.user.userprofile.id }}){
+                        send_user_name = myself_name
+                        }else{
+                        send_user_name = friend_name
+                    }
+                    chat_record = "<div class='msg-item'><div><span> &nbsp;"+ send_user_name
+                            + "</span>" + '&nbsp;&nbsp;&nbsp;' +"<span>" + timestamp  +
+                            "</span></div>" + "<div class='msg-text'>&nbsp;&nbsp;"+ msg +"</div>" + "</div>";
+                    $('.chat-box-window').append(chat_record)
+
+                }
+            }
+
+        }
+
+
+        // 从服务器端获取消息
+        function GetMsg() {
+            $.getJSON("{% url 'get_msg' %}", function (receive_data) {
+                AddChatBox(receive_data,'not');
+                GetMsg()
+            });// end get
+        }
+
+        // 从服务器获取历史消息(历史消息值得是聊天记录存储在数据库上的)
+        function GetHistoryRecord(friend_name,friend_id) {
+            console.log('====>friend_id name',friend_id,friend_name);
+            var contact_type = $('.chat-box-title').children('span').attr('chat_type');
+            $.getJSON("{% url "GetHistoryRecord"  %}",
+                    {'peer_id': friend_id,'chat_type':contact_type},
+                    function (callback){
+                        AddChatBox(callback,'history');
+                    })
+        }
+
+
+        // 主体函数，用来检测用户是否进行了回车，如果回车那么就判断是否有输入内容，有的话再去调用发送消息
+        // 方法和 把用户的输入的信息放到聊天对话框当中
+        $(document).ready(function(){
+            $.ajaxSetup({
+                    beforeSend: function(xhr, settings) {
+                        if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                        }
+                    }
+                });
+            // 获取对方发送过来的信息
+                GetMsg();
+
+{#            $('#navbar a[href="{{ request.path }}"]').parent().addClass("active");#}
+            // send msg
+            $("body").delegate("textarea","keydown", function (e) {
+                if(e.which == 13){
+                    // Enter keydown ,send a msg to chatbox, which is listening Enter key down
+                    var msg_text = $("textarea").val();
+                    if($.trim(msg_text).length > 0){
+                        //  whether the msg_text gt 0
+                       SendMsg(msg_text,'text')
+                    } // no wait SendMsg function to run over;
+                    $('textarea').val('');
+                }})
+        });
+
+        // 把用户的输入的信息放到聊天对话框当中
+        function AddSendMsgIntoBox(msg_text,msg_type){
+            console.log('msg_text,msg_type',msg_text,msg_type);
+            if (msg_type== 'text'){
+                    var new_msg_ele = "<div class='msg-item'>"+"<span>"+"&nbsp;{{ request.user.userprofile.name }}"
+                                    + "</span>" + '&nbsp;&nbsp;&nbsp;' +"<span>" + new Date().toLocaleTimeString() +
+                                    "</span>" + "<div class='msg-text'>&nbsp;&nbsp;" + msg_text +"</div>" + "</div>";
+            }else if( msg_type.startsWith('image')){
+                var new_msg_ele = "<div class='msg-item'>"+"<span>"+"&nbsp;{{ request.user.userprofile.name }}"
+                                    + "</span>" + '&nbsp;&nbsp;&nbsp;' +"<span>" + new Date().toLocaleTimeString() +
+                                    "</span>" + "<div class='msg-text'>&nbsp;&nbsp;" +
+                        '<img style="width:300px;height:300px" src="/static/{{ request.user.userprofile.id }}/'+ msg_text +'"/>'
+                        +"</div>" + "</div>";
+            }else{
+                var new_msg_ele = "<div class='msg-item'>"+"<span>"+"&nbsp;{{ request.user.userprofile.name }}"
+                                    + "</span>" + '&nbsp;&nbsp;&nbsp;' +"<span>" + new Date().toLocaleTimeString() +
+                                    "</span>" + "<div class='msg-text'>&nbsp;&nbsp;" +
+                        '<a target="_blank" href="/static/{{ request.user.userprofile.id }}/'+ msg_text +'">发送的文件( '+msg_text+' )，点我下载</a>'
+                        +"</div>" + "</div>";
+            }
+            $(".chat-box-window").append(new_msg_ele);
+            $('.chat-box-window').animate({
+                    // 这里的200是指200毫秒 的下滑速度！
+                scrollTop: $('.chat-box-window')[0].scrollHeight},200);
+            }
+
+        // 点击不同的联系人的时候，在面板上进行切换用的,采用ajax从服务器端数据库获取数据的方法
+        function OpenChatWindow(ele){
+            $(ele).addClass('active').siblings().removeClass('active');
+            var contact_type = $(ele).attr('contact-type');
+            var friend_name = $(ele).find('.contact-name').text();
+            var friend_id = $(ele).attr('contact-id');
+            var chat_box_title_content = '正在和'+ friend_name + "聊天" +
+                    "<span style='display: none' friend_id="+ friend_id +" friend_name="+ friend_name+" chat_type=" +
+                    contact_type +">" + "</span>";
+            $(".chat-box-title").html(chat_box_title_content);
+            $('.chat-box-window').html('');
+            GetHistoryRecord(friend_name,friend_id)
+        }
+
+        // 这个通过点击按钮后来获取历史消息记录从后端
+        function get_old_chatrecord(a){
+            var contact_type = $('.chat-box-title').children('span').attr('chat_type');
+            var friend_name = $('.chat-box-title').children('span').attr('friend_name');
+            var friend_id = $('.chat-box-title').children('span').attr('friend_id');
+            $('.chat-box-window').html('');
+            GetHistoryRecord(friend_name,friend_id)
+        }
+
+        // 点击不同的联系人的时候，在面板上进行切换用的,采用本地全局字典聊天记录的方法
+        function OpenChatWindow_local(ele){
+            $(ele).addClass('active').siblings().removeClass('active');
+            // 隐藏消息提醒，并且把消息条数置为0
+            $(ele).children('.badge').text('0').addClass('hide');
+            $(ele).attr('style','').siblings().attr('style','background-color: black ;color: white');
+            var contact_type = $(ele).attr('contact-type');
+            var friend_name = $(ele).find('.contact-name').text();
+            var friend_id = $(ele).attr('contact-id');
+            var gp_list =$(ele).children('div:last').html();
+            if( gp_list!=undefined ) {
+                if( gp_list.length < 1 ){
+                    if(contact_type=='group'){ // 获取组成员信息
+                        $.getJSON('{% url "get_group_numbers" %}',
+                        {'group_id':friend_id},
+                        function(result) {
+                            // 遍历返回的字典
+                            for (var i in result) {
+                                data = result[i];
+                                // 群主只有一个
+                                if (typeof(data) == 'string') {
+                                    group_ower = data;
+                                    console.log('begin record admin....');
+                                    $(ele).children('div:last').append('<span style="color:black ;font-size:larger;color:red" role="owner"  number_id='+ i +'>' + "群主 " + group_ower + '</span></br>')
+                                } else if (i == 'group_admins') {
+                                    // 判断是不是属于群管理员的
+                                    for (var ai in data) {
+                                        admins_data = data[ai];
+                                        admins_name = admins_data.name;
+                                        admins_id = admins_data.id;
+                                        html_content = '<span style="color:black ;font-size:normal;color:white" role="admin" number_id='+ admins_id +'>' + '管理 ' + admins_name + '</span></br>'
+                                        $(ele).children('div:last').append(html_content)
+                                    } // end for loop
+                                } else {
+                                    for (var ai in data) {
+                                        // 既不是管理员，也不是群主，那么剩下的就属于群成员的。
+                                        number_data = data[ai];
+                                        number_name = number_data.name;
+                                        console.log('number -- id',number_data.id);
+                                        number_id = number_data.id;
+                                        html_content = '<span style="color:green" role="number" number_id='+number_id+'>'+"成员 "+number_name + '</span></br>';
+                                        $(ele).children('div:last').append(html_content);
+                                    }}}})}}}
+
+            // 切换之前把当前的聊天记录归档
+            var cur_session_id = $('.chat-box-title').children('span').attr('friend_id');
+            var cur_session_type = $('.chat-box-title').children('span').attr('chat_type');
+            if(cur_session_id){ // judge whether has cur_session_id
+                // do switch
+                GLOBAL_CHAT_RECORD_DIC[cur_session_type][cur_session_id] = $('.chat-box-window').html();
+            }
+            if(contact_type == 'group'){
+                friend_name = friend_name+'群 '
+            }
+            var chat_box_title_content = '正在和 '+ friend_name + "聊天" +
+                    "<span style='display: none' friend_id="+ friend_id +" friend_name="+ friend_name+" chat_type=" +
+                    contact_type +">" + "</span>";
+            $(".chat-box-title").html(chat_box_title_content);
+
+            var new_contact_chat_record = GLOBAL_CHAT_RECORD_DIC[contact_type][friend_id];
+            console.log('this is chat record!!',new_contact_chat_record);
+            if (typeof new_contact_chat_record == 'undefined'){
+                new_contact_chat_record = ''
+            }
+            $('.chat-box-window').html(new_contact_chat_record);
+        }
+
+
+
+
+        // 针对文件上传的处理方法,提交文件内容
+        function FileUpload() {
+            var form_data = new FormData();
+            var file_info = $('#file_upload')[0].files[0];
+            form_data.append('file',file_info);
+            var friend_info = $('.chat-box-title span').attr('friend_id');
+            if( friend_info==undefined ) {
+                alert("没有选中对应的朋友");
+                return false
+            }else if(file_info==undefined){
+                alert('你没有选择任何文件 或者 没有选中对应的朋友');
+                return false
+            }
+            // 提交ajax的请求
+            $.ajax({
+                url:"{% url 'file_upload' %}",
+                type:'POST',
+                data: form_data,
+                processData: false,  // tell jquery not to process the data
+                contentType: false, // tell jquery not to set contentType
+                success: function(data) {
+                    console.log(data);
+                }
+            }); // end ajax
+           GetFileUploadProgress(file_info);
+        }
+
+
+          //获取文件上传比例，实时更新上传进度条的
+        function GetFileUploadProgress(file_obj) {
+            var UploadProcessRefresh = setInterval(function() {
+                $.getJSON("{% url 'file_upload_progress' %}",{'filename':file_obj.name},
+                function(callback){
+                    // 展现进度条，
+                    $('.progress').removeClass('hide');
+                    if(file_obj.size >= callback.recv_size ){
+                        // upload done ，so cancel the really time task
+                        clearInterval(UploadProcessRefresh);
+                        AddSendMsgIntoBox(file_obj.name,file_obj.type);
+                        $.get("{% url 'delete_cache_key' %}",{'cache_key':file_obj.name},function(callback){
+                            console.log(callback);
+                            setTimeout("$('.progress').addClass('hide')",3000)
+                        })
+                    }
+                        // 计算百分比
+                        var tmp_current_percent = (callback.recv_size / file_obj.size) * 100;
+                        var cur_percent = Math.round(tmp_current_percent * 100) / 100 + "%";
+                        console.log('cur_percent -====>', cur_percent);
+                        if(cur_percent!='0%'){
+                        $('.progress-bar').css("width", cur_percent);
+                        $('.progress-bar').text(cur_percent);
+                        }
+                })
+            },1000);
+        }
+
+
+        //把聊天记录提交到后台的，提交前判断是否有选中了某个好友或者群组
+        function SendMsg(msg_text,msg_type){
+            var GetCsrf = $("input[name='csrfmiddlewaretoken']").val();
+            var friend_id = $('.chat-box-title').children('span').attr('friend_id');
+            var contact_type = $('.chat-box-title').children('span').attr('chat_type');
+            var msg_content = $('#msg').val().trim();
+            if( !friend_id ){
+                alert('你没有选中对应的好友或群组！！');
+                return false
+            }else{
+                var msg_item = {
+                    'from':"{{ request.user.userprofile.id }}",
+                    'from_name':'{{ request.user.userprofile.name }}',
+                    'to': friend_id,
+                    'type': contact_type,
+                    'msg': msg_content,
+                };
+                // begin post
+                $.post("{% url 'send_msg' %}",{data:JSON.stringify(msg_item)},
+                        // end post
+                    function(callback){
+                        if(callback){
+                            console.log(callback);
+                            return true
+                        }
+                    }
+                )
+        }
+            AddSendMsgIntoBox(msg_text,msg_type)
+            }
+    function  change_color(ele){
+        // 切换选项组颜色的
+        $(ele).attr('style','color: white;background-color: #337ab7').parent().siblings('li').children('a').
+                            attr('style','color: white;background-color: black')
+    }
+
+    function get_group_numbers(group_id){
+        $.getJSON('{% url "get_group_numbers" %}',
+                {'group_id':group_id},
+                function(callback){
+                    console.log(callback);
+                    return callback
+        })
+    }
+
+
+    </script>
+{% endblock %}

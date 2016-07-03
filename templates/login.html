@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block page-container %}
+    <form action="" method="post">{% csrf_token %}
+        <div class="panel panel-primary">
+            <div class="panel-heading">请先登录</div>
+              <div class="panel-body">
+                <label>用户名</label>
+                    <input type="text" name="username"  style="float:none" class="col-sm-2"  placeholder="username">
+              </div>
+              <div class="panel-body">
+                <label>密 &nbsp;码:</label>
+                  <input type="password" name="password" style="float:none" class="col-sm-2"  placeholder="Password">
+              </div>
+               <button type="submit"  style="left: 100px;" class="btn btn-default ">登陆</button>
+                <div>
+                {% if login_err %}
+                    <p style="color: red">{{ login_err }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+{% endblock %}

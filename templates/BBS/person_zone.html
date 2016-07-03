@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block page-container %}
+
+    <h4 style="margin-top: -100px;" >欢迎 &nbsp;{{ request.user.userprofile.name }} &nbsp;回来</h4>
+    <h6 style="color: gray">您总共写下的文章数量</h6>
+          文章总数：{{ article_total }} &nbsp;&nbsp;&nbsp;
+          已经发布：{{ already_published }} <br/>
+          草&nbsp;稿 &nbsp;箱：{{ in_draft }} &nbsp;&nbsp;&nbsp;&nbsp;
+          隐藏文章：{{ in_hide }} <br/><hr/>
+
+    <form class="search_in_personal" action='{% url "search_article" %}' method="post">
+        {% csrf_token %}
+        <h6 style="color: gray">过滤您需要的文章</h6>
+        <input style="display: none;" name="{{ request.user.userprofile.name }}">
+        <input type="text" id="article_title" name="title" placeholder="请输入文章标题">
+        <select  name="article_status">
+            <option value="all" selected>全部</option>
+            <option value="published" >已发布</option>
+            <option value="draft" >草稿</option>
+            <option value='hidden'>隐藏</option>
+        </select>
+        </br><input type="submit" class="btn btn-primary" value="搜索">
+        <a type="submit" href="/bbs/add_article" class="btn btn-info" value="add_article">写日志</a>
+    </form>
+    <hr/>
+    <table class="table table-striped">
+        <caption style="color: #4cae4c">您所写下的文章</caption>
+        <thead>
+            <tr>
+{#                <td>序号</td>#}
+                <td>标题</td>
+                <td>归属模块</td>
+                <td>发布日期</td>
+                <td>最后修改时间</td>
+                <td>当前文章状态</td>
+            </tr>
+        </thead>
+        <tbody>
+            {% for article in article_list %}
+                    <tr>
+{#                        <td><a href="/bbs/articles/{{ article.id }}"></a></td>#}
+                        <td><a href="/bbs/articles/{{ article.id }}">{{ article.title }}</a></td>
+                        <td>{{ article.category }}</td>
+                        <td>{{ article.pub_date }}</td>
+                        <td>{{ article.last_modify }}</td>
+                        <td class="{% if article.status == 'hidden' %}
+                        yingchang
+                        {% else %}{{ article.status }}{% endif %}">
+                            {{ article.get_status_display }}
+                        </td>
+                    </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
+{% block bottom-js %}
+    <script>
+        function GetCrsf(){
+            return $('input[name="csrfmiddlewaretoken"]').val();
+        }
+
+        $(document).ready(function(){
+            // 处理搜索文章，暂且不用。
+            $(".search_in_personal button").click(function(){
+                var search_key  = $('#article_title').val();
+                var article_status = $('.search_in_personal select option:selected').val();
+                console.log(GetCrsf());
+                if ( search_key.trim().length <= 0){
+                    alert('请输入文章标题')
+                }else{
+                    // 提交请求
+                    $.post("{% url 'search_article' %}",
+                            {
+                                'title':search_key,
+                                'article_status': article_status,
+                                'login_username':'{{ request.user.userprofile.name }}',
+                                'csrfmiddlewaretoken':GetCrsf()
+                            },//end post args
+                            function(callback){
+                                if(callback == 'not_find' ){
+                                    alert('没有找到对应的文章')
+                                }else{
+                                    return true
+                                }
+                            }
+                    ) //end post
+                }
+            }) //end button click
+        });//
+    </script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block page-container %}
+<h3 xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">{{ title_of_page }}</h3></<br>
+{#            <input style="display: none;" name="{{ request.user.userprofile.id }}">#}
+{#            标&nbsp;题&nbsp;<input type="text" name="title"><hr/>#}
+{#            简&nbsp;介&nbsp;<input type="text" name="brief"><hr/>#}
+{#            内 &nbsp;容:&nbsp;<textarea name="content" cols="100" rows="3"></textarea><hr/>#}
+{#            发布日期：<input type="text" name="pub_date"><hr/>#}
+{#            优先级&nbsp;：<input type="text" name="priority"><hr/>#}
+{#            文章图像：<input name="head_img" type="file"><hr/>#}
+{#            归属板块: <select name="category">#}
+{#                        {% for op in category_list %}#}
+{#                            <option>{{ op.name }}</option>#}
+{#                        {% endfor %}#}
+{#                        </select><hr/>#}
+{#            {% for st in status_list %}#}
+{#                <input type="submit" name="{{ st }}" value="{{ st }}" class="btn btn-success">#}
+{#            {% endfor %}#}
+        {% if errors %}
+            <span style="color: red; font-size: larger">{{ errors }}</span>
+        {% endif %}
+        <form  class="form-horizontal"  method="post"  enctype="multipart/form-data">{% csrf_token %}
+            <div class="form-group">
+                {% for info in article %}
+                    {% if info.field.required %}
+                        <!--<label  class="col-sm-2 control-label">{{ info.label }}*</label>-->
+                        <label style="font-size: larger">{{ info.label }}*</label></br>
+                    {% else %}
+                        <!--<label style="font-weight: lighter" class="col-sm-2 control-label">-->
+                            <!--{{ info.label }}-->
+                        <!--</label>-->
+                        {{ info.label }}</br>
+                    {% endif %}
+                        <!--<div class="col-sm-10">-->
+                            <!--{{ info }}</br>-->
+                        <!--</div>-->
+                        {{info}}</br>
+                {% endfor %}
+            <input name="author" style="display: none;" value="{{ request.user.userprofile.id }}">
+            </div>
+            <div class="col-sm-11">
+                <input type="submit"  class="btn btn-primary " value="Save">
+               <a href="/person_zone/{{ request.user.userprofile.id }}"  class="btn btn-danger">Cancel</a>
+            </div>
+            </form>
+{% endblock %}
+{% block bottom-js %}
+    <script src="/static/bootstrap/js/jquery-2.1.4.js"></script>
+    <script>
+        $(document).ready(function () {
+            window.resizeTo(10,70)
+        })
+    </script>
+    <script src="/static/ckeditor/ckeditor.js"></script>
+    <script type="text/javascript">
+            CKEDITOR.replace('id_content')
+    </script>
+{% endblock %}

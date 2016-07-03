@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% load  customer_tag %}
+{% load for_bbs %}
+{% block page-container %}
+    <div class="">
+        {% for article in article_list %}
+            {% csrf_token  %}
+            <div class="article-box row">
+                <div class="article-head-img col-md-4">
+                    <img class="article-head-img" src="/static/{{ article.head_img|truncate_url }}" >
+                </div>
+                <div class="article-brief col-md-8">
+                    <a class="article-title" href="{% url 'article_detail' article.id %}">
+                        {{ article.title }}<br/>
+                    </a>
+                    <div class="article-brief-info">
+                        <span  style="display: none;"  article_id="{{ article.id }}"></span>
+                        <span>{{ article.author.name }}&nbsp;</span>
+                        <span>{{ article.pub_date }} &nbsp;&nbsp;</span>
+                        <span>{%  filter_comment article as comments %} </span>
+                        <span class="glyphicon glyphicon-comment" aria-hidden="true"></span>
+                           {{ comments.comment_count }}
+                        &nbsp;<a href="" style='text-decoration:none;' onclick="click_praise(this)"
+                            class="glyphicon glyphicon-thumbs-up" aria-hidden="true">
+                           {{ comments.thumb_count }}</a>
+                    </div>
+                    <div class="article-brief-text">
+                        <p>{{ article.brief }}</p>
+                    </div>
+                </div>
+            </div>
+            <hr>
+        {% endfor %}
+    </div>
+        <nav>
+        <ul style="" class="pagination">
+            {% if article_list.has_previous %}
+                <li class=""><a href="?page={{ article_list.previous_page_number }}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span></a></li>
+            {% endif %}
+                  {% for page_num in article_list.paginator.page_range %}
+                      {% guess_page article_list.number page_num %}
+                  {% endfor %}
+            {% if article_list.has_next %}
+                <li class="">
+                    <a href="?page={{ article_list.next_page_number }}" aria-label="Previous">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            {% endif %}
+        </ul>
+
+    </nav>
+    <div class="wrap-right">
+    </div>
+    <div class="clear-both"></div>
+
+{% endblock %}
+
+{% block bottom-js %}
+    <script src="/static/bootstrap/js/jquery-2.1.4.js"></script>
+    <script>
+        //获取点赞数的函数
+        function Get_Praise(article_id,ele){
+            $.get("{% url "post_comment" %}",
+                    {'id':article_id,'choice':2}, //紧跟的是参数
+                    function (data) {
+                        $(ele).html('&nbsp;'+data)
+                    }
+            )
+        }
+
+        //提交点赞请求
+        function click_praise(ele){
+            var article_id = $(ele).siblings().first().attr('article_id');
+            var GetCsrf = $("input[name='csrfmiddlewaretoken']").val();
+            // begin post
+            $.post("{% url 'post_comment' %}",
+                    {
+                        'comment_type':2,
+                        'article':article_id,
+                        'user':'{{ request.user.userprofile.id }}',
+                        'csrfmiddlewaretoken': GetCsrf,
+                    }, //end post
+                    function(callback){
+                        if(callback=='error'){
+                            alert('点赞失败，可能是网络问题导致的')
+                        }else if(callback=='limit'){
+                            alert('您已经点赞过一次了，请勿重复点赞！！')
+                        } else{
+                            Get_Praise(article_id,ele)
+                        }
+                    }
+            )
+        }
+    </script>
+{% endblock %}

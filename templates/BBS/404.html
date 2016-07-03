@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block page-container %}
+    没有找到你要的文章，
+    <a href="/person_zone/{{ request.user.userprofile.id }}" style="color: #1b6d85;font-size: large">点此返回上一页</a>
+{% endblock %}

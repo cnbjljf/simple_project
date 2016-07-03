@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% load for_bbs %}
+{% block page-container %}
+
+    <div class="wrap-left">
+        <div class="article-title-bg">
+            {{ article_obj.title }}
+        </div>
+        <div class="article-title-brief">
+            <span>作者:{{ article_obj.author.name }}</span>
+            <span>{{ article_obj.pub_date }}</span>
+            <span>
+                <span class="glyphicon glyphicon-comment" aria-hidden="true"></span>
+                {% filter_comment article_obj as comments %}
+                {{ comments.comment_count }}
+            </span>
+        </div>
+        <div class="article-content">
+            <img class="article-detail-head-img"  src="/static/{{ article_obj.head_img|truncate_url }}">
+            {{ article_obj.content |safe }}
+        </div>
+            <!--展示评论内容-->
+          <div class="comment-list">
+
+           </div>
+
+
+        <div class="comment-box">
+            {% if request.user.is_authenticated %}
+                 <textarea class="form-control" rows="3"></textarea>
+                    {% csrf_token %}
+                 <button type="button" style="margin-top: 10px" class="btn btn-success pull-right">评论</button>
+
+            {% else %}
+                <div class="jumbotron">
+                  <h4 class="text-center"><a class="btn-link" href="{% url 'login' %}?next={{ request.path }}">登录</a>后评论</h4>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+    <div class="wrap-right">
+    </div>
+    <div class="clear-both"></div>
+
+{% endblock %}
+
+
+{% block bottom-js %}
+<script>
+    $(document).ready(
+        GetComments()
+    )
+
+    function PostChlidComment(a){
+        //提交子评论的功能
+        var ParentCommentId = $(a).siblings('input').first('input').val();
+        console.log('Dad',ParentCommentId);
+        var ChildComment = $(a).siblings('input').last().val().trim();
+        console.log('Child',ChildComment);
+        if ( ChildComment == 0 ){
+            alert('请输入评论')
+        }else{
+            $.post("{% url 'post_comment' %}",
+                    {
+                    'comment_type':1,
+                    'article':"{{ article_obj.id }}",
+                    'parent_comment':ParentCommentId,
+                    'comment':ChildComment,
+                    'user':'{{ request.user.userprofile.id }}',
+                    'csrfmiddlewaretoken':getCsrf()
+                    }, // end post
+                    function(callback){
+                        console.log(callback);
+                        if(callback == 'post-comment-success'){
+                            GetComments()
+                        }else{
+                            alert('提交评论失败，请重新填写提交')
+                        }
+                    }
+            )
+        }
+    }
+
+    function  expansion_comment(a) {
+{#        此处写展开评论框的功能#}
+        // 判断回复框有多少个，并且对用户在评论之前判断是否登陆，如果没有登陆不允许评论，提示需要登陆评论
+        //  下面html 代码里面嵌套了 jinja 代码，
+        if ( $(a).siblings('input').size() == 1  ){
+            if( $(a).siblings('span').size() == 2 ){
+                $(a).after('{% if request.user.is_authenticated %} \
+                      </br><input type="text" name="child_comment" style="width:80%"> \
+                      <button type="button" onclick="PostChlidComment(this)" class="btn btn-info">回复</button> \
+                      {% else %} \
+                      <span style="color: red;font-size: larger">&nbsp;&nbsp;you are not login the BBS,\
+                        So you can not comment ..please login first ! thanks</span> \
+                        {% endif %}')
+            }}
+    }
+
+    function GetComments(){
+        // 获取评论的功能
+        $.get("{% url 'get_comments' article_obj.id %}",function(callback){
+            console.log(callback);
+            $(".comment-list").html(callback);
+        });//end get
+    }
+    function getCsrf(){
+        return $("input[name='csrfmiddlewaretoken']").val();
+    }
+    $(document).ready(function(){
+        //提交父评论的代码，通过ajax提交，提交前判断是否有有评论
+        $(".comment-box button").click(function(){
+            var comment_text = $(".comment-box textarea").val();
+            if (comment_text.trim().length == 0 ){
+                alert("评论不能为空,sb");
+            }else{
+                //post
+
+                $.post("{% url 'post_comment' %}",
+                        {
+                            'comment_type':1,
+                            'article':"{{ article_obj.id }}",
+                            'parent_comment':null,
+                            'comment':comment_text.trim(),
+							'user':'{{ request.user.userprofile.id }}',
+                            'csrfmiddlewaretoken':getCsrf()
+                        },//end post args
+                        function(callback){
+                            console.log(callback);
+                            if (callback == 'post-comment-success'){
+                                var comment_text = $(".comment-box textarea").val('');
+                                GetComments()
+                            }
+                })//end post
+            }
+        });//end button click
+    });
+</script>
+{% endblock %}
